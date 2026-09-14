@@ -25,6 +25,9 @@ if [[ "$ENV" == "dev" ]]; then
   az acr build --registry "$registry" --image "$repo:$TAG" "$ROOT/agent" --no-logs --output none
 else
   echo "Importing $repo:$TAG from $dev_registry into $registry (same digest, no rebuild) ..."
-  az acr import --name "$registry" --source "$dev_registry.azurecr.io/$repo:$TAG" --image "$repo:$TAG" --force --output none
+  # The source is given by resource id, so the import pulls with the caller's own Azure identity
+  # (AcrPull on the dev group). A bare login server would be treated as an anonymous external registry.
+  dev_registry_id="/subscriptions/$AZURE_SUBSCRIPTION_ID/resourceGroups/rg-ais-${REGION_CODE}-${WORKLOAD}-dev/providers/Microsoft.ContainerRegistry/registries/$dev_registry"
+  MSYS_NO_PATHCONV=1 az acr import --name "$registry" --registry "$dev_registry_id" --source "$repo:$TAG" --image "$repo:$TAG" --force --output none
 fi
 echo "image=$registry.azurecr.io/$repo:$TAG"
