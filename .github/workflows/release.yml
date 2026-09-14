@@ -1,0 +1,41 @@
+name: Release
+
+# A push to main is a release candidate. The same commit moves through three stages, and the
+# image built once in the dev job is the image test and prod deploy:
+#   dev  : build the image, deploy, smoke test
+#   test : deploy the same image, smoke test, evaluation gate (a failing gate stops the run here)
+#   prod : waits for the required reviewer, deploys the same image, pins the endpoint, smoke tests the pin
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  dev:
+    uses: ./.github/workflows/deploy-stage.yml
+    with:
+      env: dev
+      image_tag: ${{ github.sha }}
+
+  test:
+    needs: dev
+    uses: ./.github/workflows/deploy-stage.yml
+    with:
+      env: test
+      image_tag: ${{ github.sha }}
+
+  prod:
+    needs: test
+    uses: ./.github/workflows/deploy-stage.yml
+    with:
+      env: prod
+      image_tag: ${{ github.sha }}

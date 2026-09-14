@@ -1,0 +1,6 @@
+{"query": "What time do you open on Saturday?", "expected": "7 AM"}
+{"query": "Are you open on Sunday?", "expected": "8 AM"}
+{"query": "How much notice do you need for a custom cake?", "expected": "48 hours"}
+{"query": "Do you have anything nut-free?", "expected": "cannot guarantee"}
+{"query": "I want a refund for a stale loaf.", "expected": "team member"}
+{"query": "Where are you located?", "expected": "Hoboken"}

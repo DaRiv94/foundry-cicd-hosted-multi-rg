@@ -1,0 +1,72 @@
+name: Deploy stage (reusable)
+
+# One job that deploys ONE environment. dev, test, and prod all run these same steps.
+# The Environment name decides which variables the job sees, which federated credential the
+# OIDC token maps to, and (for prod) whether a reviewer must approve before the job starts.
+
+on:
+  workflow_call:
+    inputs:
+      env:
+        description: "dev, test, or prod"
+        required: true
+        type: string
+      image_tag:
+        description: "Image tag to build (dev) or reuse (test, prod). The commit sha."
+        required: true
+        type: string
+
+permissions:
+  id-token: write   # OIDC token for azure/login. No stored secrets anywhere.
+  contents: read
+
+jobs:
+  stage:
+    name: ${{ inputs.env }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.env }}
+    # A Foundry account accepts one deployment at a time (RequestConflict otherwise). Each
+    # environment has its own account here, so jobs only queue behind jobs for the same environment.
+    concurrency:
+      group: deploy-${{ vars.WORKLOAD }}-${{ inputs.env }}
+      cancel-in-progress: false
+    env:   # the same names the scripts read from .env on a laptop
+      AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      REGION_CODE: ${{ vars.REGION_CODE }}
+      WORKLOAD: ${{ vars.WORKLOAD }}
+      AGENT_NAME: ${{ vars.AGENT_NAME }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC, the Environment's managed identity)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy infrastructure
+        run: bash scripts/1_deploy_infra.sh ${{ inputs.env }}
+
+      - name: Build the image (dev) or confirm it exists (test, prod)
+        run: bash scripts/2_build_image.sh ${{ inputs.env }} ${{ inputs.image_tag }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -q -r requirements.txt
+
+      - name: Deploy agent (new immutable version from the image)
+        id: deploy
+        run: python scripts/3_deploy_agent.py --env ${{ inputs.env }} --image-tag ${{ inputs.image_tag }}
+
+      - name: Pin the endpoint to this version (prod only)
+        if: inputs.env == 'prod'
+        run: python scripts/6_pin_version.py --env prod --agent-version ${{ steps.deploy.outputs.version }}
+
+      - name: Smoke test
+        run: python scripts/4_smoke_test.py --env ${{ inputs.env }}
+
+      - name: Evaluation gate (test only)
+        if: inputs.env == 'test'
+        run: python scripts/5_evaluate.py --env test --agent-version ${{ steps.deploy.outputs.version }}
