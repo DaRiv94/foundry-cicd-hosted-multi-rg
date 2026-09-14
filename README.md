@@ -24,7 +24,7 @@ A prompt agent is a definition: a model name plus instructions. A hosted agent i
 - `agent/main.py`, `agent/requirements.txt`, `agent/Dockerfile`: the code and how to package it.
 - A container registry per environment in `infra/main.bicep`, and a role assignment so each Foundry project can pull from its own registry.
 - `scripts/2_build_image`: one more step between infra and deploy. Dev builds inside its registry. Test and prod import the same digest from the dev registry into theirs.
-- Two more roles for each pipeline identity. Foundry Owner cannot create a registry or grant the pull role, so each identity also gets Contributor and Role Based Access Control Administrator on its group. The test and prod identities also get AcrPull on the dev group, because the import reads from there.
+- Two more roles for each pipeline identity. Foundry Owner cannot create a registry or grant the pull role, so each identity also gets Contributor and Role Based Access Control Administrator on its group. The test and prod identities also get Reader and AcrPull on the dev group, because the import reads from there.
 - A wait. A new version pulls the image and starts a sandbox before it reports active, which takes a few minutes. The deploy script polls for it.
 
 Everything else is the same: the three GitHub Environments, the reusable stage, the evaluation gate, the pin, the rollback.
@@ -212,7 +212,7 @@ Mac / Linux (Bash)
 ./scripts/0b_pipeline_identity.sh
 ```
 
-It creates one managed identity in each resource group with one federated credential each. The dev credential trusts only jobs that run inside the `dev` GitHub Environment, and the same for test and prod. Each identity gets three roles on its own group, and each one pays for one pipeline step: Contributor creates the registry and runs the build or the import, Role Based Access Control Administrator writes the pull role for the project identity, and Foundry Owner creates the Foundry resources and the agent versions. The test and prod identities also get AcrPull on the dev group, the one cross-environment permission in the project, because `az acr import` reads from the dev registry.
+It creates one managed identity in each resource group with one federated credential each. The dev credential trusts only jobs that run inside the `dev` GitHub Environment, and the same for test and prod. Each identity gets three roles on its own group, and each one pays for one pipeline step: Contributor creates the registry and runs the build or the import, Role Based Access Control Administrator writes the pull role for the project identity, and Foundry Owner creates the Foundry resources and the agent versions. The test and prod identities also get Reader and AcrPull on the dev group, the one cross-environment permission in the project, because `az acr import` reads the source registry and pulls from it.
 
 4. Wait about ten minutes for the role assignments to propagate, then push a change or start the Release workflow from the Actions tab. If the first run fails at the login step with "No subscriptions found", it was too early. Rerun it.
 

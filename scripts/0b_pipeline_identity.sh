@@ -8,7 +8,7 @@
 #        Role Based Access Control Administrator writes the registry reader assignment for the project identity (Bicep)
 #        Foundry Owner                          creates the Foundry account, project, and agent versions
 #      A prompt agent needs only the last one. The container registry is what adds the other two.
-#      The test and prod identities also get AcrPull on the DEV group: az acr import reads the image from there.
+#      The test and prod identities also get Reader + AcrPull on the DEV group: az acr import reads the source registry and pulls from it.
 #   4. the GitHub Environment and its variables (prod gets a required reviewer)
 # Requires: az login, gh auth login (repo + workflow scope), and the GitHub repo already pushed.
 # Usage:  ./scripts/0b_pipeline_identity.sh            (reviewer = the signed-in gh user)
@@ -60,9 +60,12 @@ for e in dev test prod; do
   done
   echo "$e : Contributor + Role Based Access Control Administrator + Foundry Owner on $rg"
   if [[ "$e" != "dev" ]]; then
-    MSYS_NO_PATHCONV=1 az role assignment create --assignee-object-id "$principal_id" --assignee-principal-type ServicePrincipal \
-      --role "AcrPull" --scope "/subscriptions/$sub/resourceGroups/rg-ais-$rc-$wl-dev" --query id -o tsv > /dev/null
-    echo "$e : AcrPull on rg-ais-$rc-$wl-dev (source of az acr import)"
+    # az acr import checks two things on the SOURCE registry: registries/read (Reader) and pull (AcrPull).
+    for role in "Reader" "AcrPull"; do
+      MSYS_NO_PATHCONV=1 az role assignment create --assignee-object-id "$principal_id" --assignee-principal-type ServicePrincipal \
+        --role "$role" --scope "/subscriptions/$sub/resourceGroups/rg-ais-$rc-$wl-dev" --query id -o tsv > /dev/null
+    done
+    echo "$e : Reader + AcrPull on rg-ais-$rc-$wl-dev (source of az acr import)"
   fi
 
   # 4. GitHub Environment + variables. prevent_self_review is only accepted together with reviewers;
