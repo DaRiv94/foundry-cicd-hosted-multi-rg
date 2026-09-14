@@ -187,7 +187,7 @@ What you see
 
 - `1_deploy_infra` prints that environment's project endpoint. Each environment takes two to three minutes the first time and seconds after that.
 - `2_build_image -Env dev` uploads the `agent` folder to the dev registry and builds there, about two minutes. `-Env test` and `-Env prod` import the tag from the dev registry in a few seconds and print the same digest.
-- `3_deploy_agent` prints `frankies-bakery-support version 1 created from acraiseushamultidev.azurecr.io/frankies-bakery-support:v1`, then a `status: creating` line every five seconds until `status: active`. The first version of an image takes a few minutes while the platform pulls it and starts the sandbox. Version numbers count per project, so dev, test, and prod each start at 1.
+- `3_deploy_agent` prints `frankies-bakery-support version 1 created from acraiseushamultidev.azurecr.io/frankies-bakery-support:v1`, then a `status: creating` line every five seconds until `status: active`. Expect under a minute; the platform pulls the image and prepares the sandbox. A `status: failed` with `ImageError` means the project identity cannot pull from its registry (the AcrPull role assignment in Bicep is what allows it). Version numbers count per project, so dev, test, and prod each start at 1.
 - `4_smoke_test` may print `attempt 1 failed` once while the sandbox starts, then the answer.
 - `5_evaluate` polls for about two minutes, prints one line per question, then `Pass rate 6/6 = 100% (minimum 80%)` and `GATE PASSED`.
 - `6_pin_version` prints which version the prod endpoint now serves.
